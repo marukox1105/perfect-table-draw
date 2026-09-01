@@ -413,6 +413,31 @@
     .admin-confirm-row { display: flex; gap: 8px; }
     .admin-btn-cancel { flex:1; padding:12px; border-radius:12px; background:rgba(0,0,0,0.04); border:1px solid rgba(0,0,0,0.08); color:#6B5555; font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; }
     .admin-btn-ok { flex:1; padding:12px; border-radius:12px; background:#fce7f3; border:none; color:#9d174d; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; }
+
+    /* ── Admin tabs ─────────────────────────────────── */
+    .admin-tab-bar { display:flex; gap:4px; background:rgba(0,0,0,0.04); border-radius:10px; padding:3px; }
+    .admin-tab-btn { flex:1; padding:7px; border:none; background:transparent; border-radius:8px; font-size:12px; font-weight:700; font-family:inherit; color:#9B8B8B; cursor:pointer; transition:all 0.15s; }
+    .admin-tab-btn.active { background:#fff; color:#3D2C2C; box-shadow:0 1px 4px rgba(0,0,0,0.1); }
+
+    /* ── Settings section ───────────────────────────── */
+    .settings-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.05); }
+    .settings-row-label { font-size:13px; font-weight:600; color:#3D2C2C; }
+    .settings-row-sub { font-size:11px; color:#B8AAAA; margin-top:1px; }
+    .stepper { display:flex; align-items:center; gap:10px; }
+    .stepper-btn { width:30px; height:30px; border-radius:8px; border:1.5px solid rgba(0,0,0,0.1); background:#FAFAFA; font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#3D2C2C; line-height:1; }
+    .stepper-val { font-size:15px; font-weight:800; color:#3D2C2C; min-width:20px; text-align:center; }
+    .settings-divider { font-size:11px; font-weight:700; color:#B8AAAA; letter-spacing:.08em; text-transform:uppercase; margin:12px 0 6px; }
+    .settings-diet-row { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid rgba(0,0,0,0.05); }
+    .settings-diet-toggle { position:relative; width:38px; height:22px; flex-shrink:0; }
+    .settings-diet-toggle input { opacity:0; width:0; height:0; position:absolute; }
+    .toggle-track { position:absolute; inset:0; border-radius:11px; background:rgba(0,0,0,0.12); cursor:pointer; transition:background 0.2s; }
+    .toggle-track::after { content:''; position:absolute; width:16px; height:16px; border-radius:50%; background:#fff; top:3px; left:3px; transition:transform 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
+    input:checked + .toggle-track { background:#FF8C5A; }
+    input:checked + .toggle-track::after { transform:translateX(16px); }
+    .settings-diet-label { font-size:12px; font-weight:700; color:#3D2C2C; flex-shrink:0; min-width:70px; }
+    .settings-diet-input { flex:1; border:1.5px solid rgba(0,0,0,0.1); border-radius:8px; padding:5px 8px; font-size:12px; font-family:inherit; color:#3D2C2C; background:#FAFAFA; outline:none; }
+    .settings-diet-input:focus { border-color:#FF8C5A; background:#fff; }
+    .settings-save-btn { width:100%; margin-top:14px; padding:13px; border-radius:13px; background:linear-gradient(145deg,#FFA040,#FF6E2E); border:none; color:#fff; font-size:14px; font-weight:800; font-family:inherit; cursor:pointer; box-shadow:0 4px 14px rgba(255,110,46,0.28); }
   </style>
 </head>
 <body>
@@ -425,51 +450,54 @@
     const ADMIN_PIN  = '1234';   // ← 改這裡設定 PIN
     const TAP_NEEDED = 5;
     const TAP_WINDOW = 2500;
+    const KEY        = 'perfect-table-draw-v2';
+    const CN         = ['一','二','三','四','五','六','七','八','九','十'];
+    const T_COLOR    = ['#B8860B','#4A7C4E','#5B4DA0','#1565C0','#880E4F','#C62828','#00838F','#558B2F','#6A1B9A','#E65100'];
+    const CONFETTI_C = ['#FF8C5A','#FFD166','#9575CD','#42A5F5','#F06292','#66BB6A','#FFB347'];
 
-    const KEY         = 'perfect-table-draw-v2';
-    const TABLE_COUNT = 5;
-    const CN          = ['一','二','三','四','五'];
-    const T_COLOR     = ['#B8860B','#4A7C4E','#5B4DA0','#1565C0','#880E4F'];
-    const CONFETTI_C  = ['#FF8C5A','#FFD166','#9575CD','#42A5F5','#F06292','#66BB6A','#FFB347'];
+    const DEFAULT_SETTINGS = {
+      tableCount: 5, tableCap: 5,
+      dietVegEnabled: true,    dietVegTables: '3,4,5',
+      dietNobeefEnabled: true, dietNobeefTables: '1,2',
+      dietAllEnabled: true,    dietAllTables: '3,4,5',
+    };
+    const DIET_TABLES_KEY = { veg:'dietVegTables', nobeef:'dietNobeefTables', all:'dietAllTables' };
+    const DIET_ENABLED_KEY = { veg:'dietVegEnabled', nobeef:'dietNobeefEnabled', all:'dietAllEnabled' };
 
     /* ── Firebase ───────────────────────────────────── */
-    const dbRef = db.ref(KEY);
-    function save(d) { dbRef.set(d); }
+    const dbRef       = db.ref(KEY);
+    const settingsRef = db.ref(KEY + '/settings');
 
-    const TABLE_CAP = 5; // 每桌上限人數
+    function pickTable(participants, diet, s) {
+      const tc  = s.tableCount || 5;
+      const cap = s.tableCap   || 5;
+      const counts = Array(tc).fill(0);
+      participants.forEach(p => { if (p.table >= 1 && p.table <= tc) counts[p.table-1]++; });
 
-    // ★ 飲食分桌設定 ★
-    // 不吃牛肉 → 第 1、2 桌；其餘 → 第 3、4、5 桌
-    const DIET_RESERVED = {
-      nobeef: [1, 2],
-      veg:    [3, 4, 5],
-      all:    [3, 4, 5],
-    };
-
-    function pickTable(participants, diet) {
-      const counts = Array(TABLE_COUNT).fill(0);
-      participants.forEach(p => { if (p.table >= 1 && p.table <= TABLE_COUNT) counts[p.table-1]++; });
-
-      // 第 2 輪起（全滿過一次）：純平衡分配
-      if (participants.length >= TABLE_COUNT * TABLE_CAP) {
-        const min  = Math.min(...counts);
-        const pool = counts.reduce((a, c, i) => (c === min ? [...a, i+1] : a), []);
-        return pool[Math.floor(Math.random() * pool.length)];
+      if (participants.length >= tc * cap) {
+        const min = Math.min(...counts);
+        const pool = counts.reduce((a,c,i) => c===min ? [...a,i+1] : a, []);
+        return pool[Math.floor(Math.random()*pool.length)];
       }
 
-      // 第 1 輪：依飲食偏好分配到指定桌，桌滿才溢出
-      const preferred = (DIET_RESERVED[diet] || []).filter(t => counts[t-1] < TABLE_CAP);
+      const tablesStr = s[DIET_TABLES_KEY[diet]] || '';
+      const preferred = tablesStr.split(',').map(n=>parseInt(n.trim())).filter(n=>!isNaN(n)&&n>=1&&n<=tc&&counts[n-1]<cap);
       if (preferred.length > 0) {
-        const min  = Math.min(...preferred.map(t => counts[t-1]));
-        const pool = preferred.filter(t => counts[t-1] === min);
-        return pool[Math.floor(Math.random() * pool.length)];
+        const min = Math.min(...preferred.map(t=>counts[t-1]));
+        const pool = preferred.filter(t=>counts[t-1]===min);
+        return pool[Math.floor(Math.random()*pool.length)];
       }
 
-      // 指定桌全滿 → 溢出到任何還有空位的桌
-      const fallback = counts.reduce((a, c, i) => (c < TABLE_CAP ? [...a, i+1] : a), []);
-      const min  = Math.min(...fallback.map(t => counts[t-1]));
-      const pool = fallback.filter(t => counts[t-1] === min);
-      return pool[Math.floor(Math.random() * pool.length)];
+      const fallback = counts.reduce((a,c,i) => c<cap ? [...a,i+1] : a, []);
+      if (fallback.length > 0) {
+        const min = Math.min(...fallback.map(t=>counts[t-1]));
+        const pool = fallback.filter(t=>counts[t-1]===min);
+        return pool[Math.floor(Math.random()*pool.length)];
+      }
+
+      const min = Math.min(...counts);
+      const pool = counts.reduce((a,c,i) => c===min ? [...a,i+1] : a, []);
+      return pool[Math.floor(Math.random()*pool.length)];
     }
 
     /* ── Confetti ───────────────────────────────────── */
@@ -534,8 +562,37 @@
     }
 
     /* ── Admin Panel ────────────────────────────────── */
-    function AdminPanel({ data, onReset, onClose }) {
-      const [confirm, setConfirm] = useState(false);
+    function AdminPanel({ data, settings, onReset, onSaveSettings, onClose }) {
+      const [adminTab,      setAdminTab]      = useState('data');
+      const [confirm,       setConfirm]       = useState(false);
+      const [tc,            setTc]            = useState(settings.tableCount);
+      const [cap,           setCap]           = useState(settings.tableCap);
+      const [vegEnabled,    setVegEnabled]    = useState(settings.dietVegEnabled);
+      const [vegTables,     setVegTables]     = useState(settings.dietVegTables);
+      const [nobeefEnabled, setNobeefEnabled] = useState(settings.dietNobeefEnabled);
+      const [nobeefTables,  setNobeefTables]  = useState(settings.dietNobeefTables);
+      const [allEnabled,    setAllEnabled]    = useState(settings.dietAllEnabled);
+      const [allTables,     setAllTables]     = useState(settings.dietAllTables);
+      const [saved,         setSaved]         = useState(false);
+
+      function handleSave() {
+        const next = {
+          tableCount: tc, tableCap: cap,
+          dietVegEnabled: vegEnabled,       dietVegTables: vegTables,
+          dietNobeefEnabled: nobeefEnabled, dietNobeefTables: nobeefTables,
+          dietAllEnabled: allEnabled,       dietAllTables: allTables,
+        };
+        onSaveSettings(next);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1500);
+      }
+
+      const dietRows = [
+        { key:'veg',    label:'我吃素',    enabled:vegEnabled,    setEnabled:setVegEnabled,    tables:vegTables,    setTables:setVegTables    },
+        { key:'nobeef', label:'我不吃牛肉', enabled:nobeefEnabled, setEnabled:setNobeefEnabled, tables:nobeefTables, setTables:setNobeefTables },
+        { key:'all',    label:'我都吃',    enabled:allEnabled,    setEnabled:setAllEnabled,    tables:allTables,    setTables:setAllTables    },
+      ];
+
       return (
         <div className="modal-overlay" onClick={onClose}>
           <div className="admin-card" onClick={e => e.stopPropagation()}>
@@ -552,16 +609,71 @@
                 </svg>
               </button>
             </div>
-            <div className="admin-stat">目前共&ensp;<strong>{data.participants.length}</strong>&ensp;人完成抽籤</div>
-            {!confirm ? (
-              <button className="admin-danger-btn" onClick={() => setConfirm(true)}>清除所有資料</button>
+
+            <div className="admin-tab-bar">
+              <button className={`admin-tab-btn${adminTab==='data'?' active':''}`} onClick={() => setAdminTab('data')}>資料</button>
+              <button className={`admin-tab-btn${adminTab==='settings'?' active':''}`} onClick={() => setAdminTab('settings')}>設定</button>
+            </div>
+
+            {adminTab === 'data' ? (
+              <>
+                <div className="admin-stat">目前共&ensp;<strong>{data.participants.length}</strong>&ensp;人完成抽籤</div>
+                {!confirm ? (
+                  <button className="admin-danger-btn" onClick={() => setConfirm(true)}>清除所有資料</button>
+                ) : (
+                  <div className="admin-confirm-block">
+                    <div className="admin-confirm-msg">清除後無法復原，確定嗎？</div>
+                    <div className="admin-confirm-row">
+                      <button className="admin-btn-cancel" onClick={() => setConfirm(false)}>取消</button>
+                      <button className="admin-btn-ok" onClick={onReset}>確認清除</button>
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="admin-confirm-block">
-                <div className="admin-confirm-msg">清除後無法復原，確定嗎？</div>
-                <div className="admin-confirm-row">
-                  <button className="admin-btn-cancel" onClick={() => setConfirm(false)}>取消</button>
-                  <button className="admin-btn-ok" onClick={onReset}>確認清除</button>
+              <div style={{ overflowY:'auto', maxHeight:'60vh' }}>
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-row-label">桌數</div>
+                    <div className="settings-row-sub">活動共幾桌</div>
+                  </div>
+                  <div className="stepper">
+                    <button className="stepper-btn" onClick={() => setTc(v => Math.max(1, v-1))}>−</button>
+                    <span className="stepper-val">{tc}</span>
+                    <button className="stepper-btn" onClick={() => setTc(v => Math.min(10, v+1))}>+</button>
+                  </div>
                 </div>
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-row-label">每桌上限</div>
+                    <div className="settings-row-sub">每桌最多幾人</div>
+                  </div>
+                  <div className="stepper">
+                    <button className="stepper-btn" onClick={() => setCap(v => Math.max(1, v-1))}>−</button>
+                    <span className="stepper-val">{cap}</span>
+                    <button className="stepper-btn" onClick={() => setCap(v => Math.min(20, v+1))}>+</button>
+                  </div>
+                </div>
+                <div className="settings-divider">飲食選項</div>
+                {dietRows.map(opt => (
+                  <div key={opt.key} className="settings-diet-row">
+                    <label className="settings-diet-toggle">
+                      <input type="checkbox" checked={opt.enabled} onChange={e => opt.setEnabled(e.target.checked)} />
+                      <span className="toggle-track" />
+                    </label>
+                    <span className="settings-diet-label">{opt.label}</span>
+                    <input
+                      className="settings-diet-input"
+                      value={opt.tables}
+                      onChange={e => opt.setTables(e.target.value)}
+                      placeholder="桌號，例：1,2"
+                      disabled={!opt.enabled}
+                    />
+                  </div>
+                ))}
+                <button className="settings-save-btn" onClick={handleSave}>
+                  {saved ? '✓ 已儲存' : '儲存設定'}
+                </button>
               </div>
             )}
           </div>
@@ -691,7 +803,7 @@
     ];
 
     /* ── Input card ─────────────────────────────────── */
-    function InputCard({ data, onDraw }) {
+    function InputCard({ data, settings, onDraw }) {
       const [name, setName]       = useState('');
       const [diet, setDiet]       = useState('');
       const [error, setError]     = useState('');
@@ -724,9 +836,10 @@
           const dup = curr.participants.find(p => p.name.toLowerCase() === t.toLowerCase());
           if (dup) return; // abort — 讓 onComplete 處理
 
-          const table = pickTable(curr.participants, diet);
+          const s = curr.settings || DEFAULT_SETTINGS;
+          const table = pickTable(curr.participants, diet, s);
           const entry = { name: t, table, diet, ts: Date.now() };
-          return { participants: [...curr.participants, entry] };
+          return { ...curr, participants: [...curr.participants, entry] };
 
         }, (error, committed, snapshot) => {
           setLoading(false);
@@ -775,7 +888,7 @@
 
           <div className="diet-label">飲食偏好（必選）</div>
           <div className="diet-pills">
-            {DIET_OPTIONS.map(opt => (
+            {DIET_OPTIONS.filter(opt => (settings || DEFAULT_SETTINGS)[DIET_ENABLED_KEY[opt.value]] !== false).map(opt => (
               <button
                 key={opt.value}
                 className={`diet-pill${diet === opt.value ? ' selected' : ''}${dietError && !diet ? ' has-error' : ''}`}
@@ -838,13 +951,14 @@
     }
 
     /* ── Table overview (result page) ───────────────── */
-    function TableMiniRow({ data, myResult }) {
+    function TableMiniRow({ data, myResult, settings }) {
+      const tableCount = (settings || DEFAULT_SETTINGS).tableCount;
       const tables = useMemo(() =>
-        Array.from({ length: TABLE_COUNT }, (_, i) => ({
+        Array.from({ length: tableCount }, (_, i) => ({
           n: i + 1,
           people: data.participants.filter(p => p.table === i + 1),
         }))
-      , [data]);
+      , [data, tableCount]);
 
       return (
         <div className="card result-anim" style={{ animationDelay: '0.08s' }}>
@@ -875,7 +989,7 @@
     }
 
     /* ── Home Tab ───────────────────────────────────── */
-    function HomeTab({ data, myResult, onDraw, onViewTables, onTitleTap }) {
+    function HomeTab({ data, myResult, settings, onDraw, onViewTables, onTitleTap }) {
       const [showConf, setShowConf] = useState(false);
 
       function handleDraw(result, newData) {
@@ -893,7 +1007,7 @@
             <HeroSection title="抽籤結果" subtitle={"太棒了！\n快去找你的小夥伴一起坐吧！"} onTitleTap={onTitleTap} />
             <div className="page-body">
               <ResultCard result={myResult} />
-              <TableMiniRow data={data} myResult={myResult} />
+              <TableMiniRow data={data} myResult={myResult} settings={settings} />
               <button className="action-btn result-anim" style={{ animationDelay:'0.16s' }} onClick={onViewTables}>
                 我知道了 🎉
               </button>
@@ -907,7 +1021,7 @@
           <Confetti active={showConf} />
           <HeroSection title="歡迎參加活動！" subtitle="請先輸入姓名，再開始抽籤" onTitleTap={onTitleTap} />
           <div className="page-body">
-            <InputCard data={data} onDraw={handleDraw} />
+            <InputCard data={data} settings={settings} onDraw={handleDraw} />
             <ProcessCard />
           </div>
         </>
@@ -915,13 +1029,14 @@
     }
 
     /* ── Tables Tab ─────────────────────────────────── */
-    function TablesTab({ data, myResult }) {
+    function TablesTab({ data, myResult, settings }) {
+      const tableCount = (settings || DEFAULT_SETTINGS).tableCount;
       const tables = useMemo(() =>
-        Array.from({ length: TABLE_COUNT }, (_, i) => ({
+        Array.from({ length: tableCount }, (_, i) => ({
           n: i + 1, color: T_COLOR[i],
           people: data.participants.filter(p => p.table === i + 1),
         }))
-      , [data]);
+      , [data, tableCount]);
 
       return (
         <div className="tables-tab">
@@ -981,10 +1096,11 @@
 
     /* ── App ────────────────────────────────────────── */
     function App() {
-      const [tab, setTab]           = useState('home');
-      const [data, setData]         = useState({ participants: [] });
-      const [myResult, setMyResult] = useState(null);
-      const [showPin, setShowPin]   = useState(false);
+      const [tab, setTab]             = useState('home');
+      const [data, setData]           = useState({ participants: [] });
+      const [settings, setSettings]   = useState(DEFAULT_SETTINGS);
+      const [myResult, setMyResult]   = useState(null);
+      const [showPin, setShowPin]     = useState(false);
       const [adminOpen, setAdminOpen] = useState(false);
       const tapCountRef = useRef(0);
       const tapTimerRef = useRef(null);
@@ -993,16 +1109,17 @@
       // Firebase real-time listener
       useEffect(() => {
         dbRef.on('value', (snap) => {
-          const val = snap.val() || { participants: [] };
-          if (!Array.isArray(val.participants)) val.participants = [];
-          setData(val);
+          const val = snap.val() || {};
+          const participants = Array.isArray(val.participants) ? val.participants : [];
+          setData({ participants });
+          if (val.settings) setSettings({ ...DEFAULT_SETTINGS, ...val.settings });
 
           // Restore this user's result after page refresh (once)
           if (!restoredRef.current) {
             restoredRef.current = true;
             const savedName = sessionStorage.getItem('ptd-my-name');
             if (savedName) {
-              const me = val.participants.find(p => p.name === savedName);
+              const me = participants.find(p => p.name === savedName);
               if (me) setMyResult({ name: me.name, table: me.table, isExisting: false });
             }
           }
@@ -1022,22 +1139,27 @@
 
       function handleDraw(result, newData) {
         setMyResult(result);
-        if (newData) setData(newData);
+        if (newData) setData({ participants: Array.isArray(newData.participants) ? newData.participants : [] });
         sessionStorage.setItem('ptd-my-name', result.name);
       }
 
       function handleAdminReset() {
-        const next = { participants: [] };
-        save(next); setMyResult(null); setAdminOpen(false);
+        db.ref(KEY + '/participants').set([]);
+        setMyResult(null); setAdminOpen(false);
         sessionStorage.removeItem('ptd-my-name');
+      }
+
+      function handleSaveSettings(newSettings) {
+        settingsRef.set(newSettings);
+        setSettings(newSettings);
       }
 
       return (
         <div className="app">
           <div className="tab-content">
             {tab === 'home'
-              ? <HomeTab data={data} myResult={myResult} onDraw={handleDraw} onViewTables={() => setTab('tables')} onTitleTap={handleTitleTap} />
-              : <TablesTab data={data} myResult={myResult} />
+              ? <HomeTab data={data} myResult={myResult} settings={settings} onDraw={handleDraw} onViewTables={() => setTab('tables')} onTitleTap={handleTitleTap} />
+              : <TablesTab data={data} myResult={myResult} settings={settings} />
             }
           </div>
 
@@ -1059,7 +1181,7 @@
             />
           )}
           {adminOpen && (
-            <AdminPanel data={data} onReset={handleAdminReset} onClose={() => setAdminOpen(false)} />
+            <AdminPanel data={data} settings={settings} onReset={handleAdminReset} onSaveSettings={handleSaveSettings} onClose={() => setAdminOpen(false)} />
           )}
         </div>
       );
