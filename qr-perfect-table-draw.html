@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Perfect Table Draw — QR</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    font-family:-apple-system,'Noto Sans TC',sans-serif;
+    background:#08080A;color:#fff;
+    min-height:100vh;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    padding:48px 20px 60px;gap:32px;
+  }
+
+  .brand{font-size:11px;font-weight:700;letter-spacing:.18em;color:rgba(255,255,255,.22);text-transform:uppercase;}
+  h1{font-size:22px;font-weight:800;letter-spacing:-.3px;text-align:center;}
+
+  .status{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;}
+  .status.ok{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.18);color:#22c55e;}
+  .status.warn{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:#f59e0b;}
+  .dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:blink 1.4s ease-in-out infinite;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.2;}}
+
+  /* Two-column card grid */
+  .cards{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
+
+  .version-card{
+    background:#111113;border:1px solid rgba(255,255,255,.09);
+    border-radius:20px;padding:22px 20px;
+    display:flex;flex-direction:column;align-items:center;gap:12px;
+    width:200px;
+  }
+
+  .version-tag{
+    font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+    padding:4px 12px;border-radius:20px;
+  }
+  .version-tag.dark{background:rgba(232,0,76,.12);color:#E8004C;border:1px solid rgba(232,0,76,.25);}
+  .version-tag.cute{background:rgba(255,140,90,.12);color:#FF8C5A;border:1px solid rgba(255,140,90,.25);}
+
+  .version-label{font-size:13px;font-weight:700;color:rgba(255,255,255,.65);}
+
+  .qr-box{background:#fff;border-radius:10px;padding:10px;display:inline-block;}
+  .qr-box img,.qr-box canvas{display:block;border-radius:4px;}
+
+  .url-label{
+    font-size:10px;color:rgba(255,255,255,.28);font-family:monospace;
+    word-break:break-all;line-height:1.5;
+    background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);
+    border-radius:8px;padding:6px 10px;width:100%;text-align:center;
+  }
+
+  /* Steps */
+  .steps-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;max-width:320px;}
+  .steps-title{font-size:11px;font-weight:700;letter-spacing:.1em;color:rgba(255,255,255,.22);text-transform:uppercase;}
+  .step{display:flex;align-items:flex-start;gap:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:10px 12px;width:100%;}
+  .step-num{flex-shrink:0;width:20px;height:20px;border-radius:50%;background:#E8004C;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+  .step-text{font-size:12px;color:rgba(255,255,255,.55);line-height:1.5;}
+  .step-text b{color:#fff;}
+
+  .footer{font-size:12px;color:rgba(255,255,255,.22);text-align:center;line-height:1.9;}
+  .footer b{color:rgba(255,255,255,.4);}
+</style>
+</head>
+<body>
+
+<div class="brand">Perfect Table Draw</div>
+<h1>掃描 QR Code 開始</h1>
+<div id="status-wrap"></div>
+
+<!-- QR cards -->
+<div class="cards">
+  <div class="version-card">
+    <span class="version-tag dark">黑桃版</span>
+    <span class="version-label">Dark Theme</span>
+    <div class="qr-box" id="qr-dark"></div>
+    <div class="url-label" id="url-dark">Generating…</div>
+  </div>
+
+  <div class="version-card">
+    <span class="version-tag cute">可愛版</span>
+    <span class="version-label">Cute Theme</span>
+    <div class="qr-box" id="qr-cute"></div>
+    <div class="url-label" id="url-cute">Generating…</div>
+  </div>
+</div>
+
+<!-- Steps -->
+<div class="steps-wrap">
+  <div class="steps-title">加到主畫面 · 全螢幕體驗</div>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-text">用 <b>相機 App</b> 掃描 QR Code，點通知以 <b>Safari</b> 開啟</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-text">點下方 <b>分享按鈕</b>（方形加箭頭圖示）</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-text">選擇 <b>「加入主畫面」</b>，再點右上角 <b>「新增」</b></div>
+  </div>
+</div>
+
+<p class="footer"><b>iPhone:</b> 相機掃描 → Safari 開啟<br>需與電腦連接相同 Wi-Fi</p>
+
+<script>
+function setStatus(ok, text) {
+  document.getElementById('status-wrap').innerHTML =
+    '<div class="status ' + (ok ? 'ok' : 'warn') + '">' +
+    (ok ? '<span class="dot"></span>' : '⚠') + ' ' + text + '</div>';
+}
+
+function makeQR(elId, urlLabelId, url) {
+  document.getElementById(urlLabelId).textContent = url;
+  var el = document.getElementById(elId); el.innerHTML = '';
+  // Primary: qrserver.com (reliable, no library needed)
+  var img = document.createElement('img');
+  img.width = 160; img.height = 160; img.style.borderRadius = '4px';
+  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=4&data=' + encodeURIComponent(url);
+  img.onerror = function() {
+    // Fallback: Google Charts
+    this.src = 'https://chart.googleapis.com/chart?chs=160x160&cht=qr&chl=' + encodeURIComponent(url) + '&choe=UTF-8';
+  };
+  el.appendChild(img);
+}
+
+function go(host) {
+  var base = location.protocol + '//' + host + '/';
+  setStatus(true, 'Network: ' + host);
+  makeQR('qr-dark', 'url-dark', base + 'perfect-table-draw.html');
+  makeQR('qr-cute', 'url-cute', base + 'perfect-table-draw-cute.html');
+}
+
+(function() {
+  if (location.protocol === 'file:') {
+    setStatus(false, 'Run start-server.sh first');
+    makeQR('qr-dark', 'url-dark', 'http://YOUR-IP:8080/perfect-table-draw.html');
+    makeQR('qr-cute', 'url-cute', 'http://YOUR-IP:8080/perfect-table-draw-cute.html');
+    return;
+  }
+  var h = new URLSearchParams(location.search).get('host');
+  if (h) { go(h); return; }
+  if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    go(location.host); return;
+  }
+  setStatus(true, 'Detecting IP…');
+  var done = false;
+  function use(h) { if (done) return; done = true; go(h); }
+  try {
+    var pc = new RTCPeerConnection({ iceServers: [] });
+    pc.createDataChannel('');
+    pc.onicecandidate = function(e) {
+      if (!e || !e.candidate) return;
+      var m = /([0-9]{1,3}(?:\.[0-9]{1,3}){3})/.exec(e.candidate.candidate);
+      if (m && m[1] !== '127.0.0.1' && !m[1].startsWith('169.254')) {
+        pc.close();
+        use(m[1] + (location.port ? ':' + location.port : ''));
+      }
+    };
+    pc.createOffer().then(function(o) { return pc.setLocalDescription(o); });
+  } catch(e) {}
+  setTimeout(function() { use(location.host); }, 2000);
+})();
+</script>
+</body>
+</html>

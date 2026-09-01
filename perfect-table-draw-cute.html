@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="抽桌">
+  <title>Perfect Table Draw</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyB1cXKhJ-fZI0aUsce3Q1lonnrD3YpfGow",
+      authDomain: "perfect-table-draw.firebaseapp.com",
+      databaseURL: "https://perfect-table-draw-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "perfect-table-draw",
+      storageBucket: "perfect-table-draw.firebasestorage.app",
+      messagingSenderId: "57680874991",
+      appId: "1:57680874991:web:c83ad46fd6ad46d4aa7a1a",
+      measurementId: "G-W108WY51FX"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+  </script>
+  <style>
+    /* ── Reset ──────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; }
+    body {
+      font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #FFF8F0;
+      color: #3D2C2C;
+      -webkit-font-smoothing: antialiased;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    /* ── App shell ──────────────────────────────────── */
+    .app {
+      display: flex; flex-direction: column;
+      height: 100dvh;
+      max-width: 480px; margin: 0 auto; width: 100%;
+    }
+    .tab-content {
+      flex: 1; min-height: 0;
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .tab-content::-webkit-scrollbar { display: none; }
+
+    /* ── Tab bar ────────────────────────────────────── */
+    .tab-bar {
+      flex-shrink: 0; background: #fff;
+      border-top: 1px solid rgba(0,0,0,0.06);
+      display: flex;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .tab-btn {
+      flex: 1; padding: 10px 8px 9px;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      cursor: pointer; border: none; background: transparent;
+      font-family: inherit; color: #C5B8B8; transition: color 0.15s;
+    }
+    .tab-btn.active { color: #FF8C5A; }
+    .tab-btn-label { font-size: 11px; font-weight: 700; }
+
+    /* ── Hero ───────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(165deg, #FFF3E6 0%, #FFE8D0 100%);
+      padding: 28px 20px 16px;
+      position: relative; overflow: hidden;
+      display: flex; align-items: flex-start;
+      min-height: 148px;
+    }
+    .hero-text { flex: 1; z-index: 1; padding-right: 100px; }
+    .hero-title {
+      font-size: 24px; font-weight: 900;
+      color: #3D2C2C; line-height: 1.3; margin-bottom: 6px;
+    }
+    .hero-sub { font-size: 13px; color: #9B8B8B; line-height: 1.6; }
+    .hero-machine {
+      position: absolute; right: -4px; bottom: 0;
+      width: 136px; height: 136px; object-fit: contain;
+      pointer-events: none;
+    }
+    /* Confetti dots */
+    .hero-dots {
+      position: absolute; inset: 0; pointer-events: none;
+    }
+    .dot {
+      position: absolute; border-radius: 50%;
+    }
+
+    /* ── Page content spacing ───────────────────────── */
+    .page-body { padding: 16px 16px 32px; display: flex; flex-direction: column; gap: 14px; }
+
+    /* ── Cards ──────────────────────────────────────── */
+    .card {
+      background: #fff; border-radius: 20px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+      padding: 20px;
+    }
+
+    /* ── Input card ─────────────────────────────────── */
+    .input-field-row {
+      display: flex; align-items: center; gap: 10px;
+      border: 1.5px solid rgba(0,0,0,0.1);
+      border-radius: 14px; padding: 14px 16px;
+      margin-bottom: 14px; background: #FAFAFA;
+      transition: border-color 0.2s;
+    }
+    .input-field-row:focus-within { border-color: #FF8C5A; background: #fff; }
+    .input-field-row.has-error { border-color: #F48FB1; }
+    .field-icon { color: #C5B8B8; flex-shrink: 0; }
+    .name-input {
+      flex: 1; border: none; background: transparent;
+      font-size: 16px; font-family: inherit; color: #3D2C2C;
+      outline: none;
+    }
+    .name-input::placeholder { color: #C5B8B8; }
+    .error-msg { font-size: 12px; color: #F06292; margin: -8px 0 10px 4px; }
+
+    /* ── Diet selector ──────────────────────────────── */
+    .diet-label { font-size: 12px; font-weight: 700; color: #9B8B8B; margin-bottom: 8px; }
+    .diet-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .diet-pill {
+      flex: 1; min-width: 0;
+      padding: 10px 6px; border-radius: 12px;
+      font-size: 13px; font-weight: 700; font-family: inherit;
+      border: 1.5px solid rgba(0,0,0,0.1); background: #FAFAFA;
+      color: #9B8B8B; cursor: pointer; text-align: center;
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .diet-pill.selected {
+      background: #FFF0E6; border-color: #FF8C5A; color: #FF6E2E;
+    }
+    .diet-pill.has-error { border-color: #F48FB1; }
+
+    /* ── Diet badge in name pill ────────────────────── */
+    .diet-dot {
+      display: inline-block; width: 7px; height: 7px;
+      border-radius: 50%; margin-right: 4px; flex-shrink: 0;
+      vertical-align: middle; position: relative; top: -1px;
+    }
+
+    .draw-btn {
+      width: 100%; padding: 17px;
+      background: linear-gradient(145deg, #FFA040, #FF6E2E);
+      color: #fff; border: none; border-radius: 50px;
+      font-size: 18px; font-weight: 900; font-family: inherit;
+      cursor: pointer; letter-spacing: 0.03em;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      box-shadow: 0 6px 20px rgba(255,110,46,0.3);
+      transition: opacity 0.15s, transform 0.1s;
+      margin-bottom: 14px;
+    }
+    .draw-btn:hover:not(:disabled) { opacity: 0.88; }
+    .draw-btn:active:not(:disabled) { transform: scale(0.975); }
+    .draw-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2.5px solid rgba(255,255,255,0.35);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.65s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .reminder-row {
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      font-size: 12px; color: #C5B8B8;
+    }
+
+    /* ── Process card ───────────────────────────────── */
+    .process-title {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      font-size: 14px; font-weight: 700; color: #6B5555;
+      margin-bottom: 18px;
+    }
+    .process-title-line { flex: 1; height: 1px; background: rgba(0,0,0,0.08); }
+    .process-steps { display: flex; align-items: flex-start; gap: 0; }
+    .process-step {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      gap: 8px; text-align: center;
+    }
+    .process-step-icon {
+      width: 64px; height: 64px;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    .process-arrow {
+      flex-shrink: 0; padding-top: 28px; color: #D4C4C4;
+      font-size: 14px; letter-spacing: -2px;
+    }
+    .process-step-title { font-size: 13px; font-weight: 800; color: #3D2C2C; }
+    .process-step-sub { font-size: 11px; color: #B8AAAA; line-height: 1.4; }
+
+    .step-img { width: 72px; height: 72px; object-fit: contain; }
+
+    /* ── Result card ────────────────────────────────── */
+    .result-name-line {
+      text-align: center; margin-bottom: 18px;
+      font-size: 15px; color: #6B5555;
+    }
+    .result-name-em { color: #FF8C5A; font-weight: 900; font-size: 17px; }
+
+    .result-orb-wrap {
+      position: relative; display: flex; justify-content: center;
+      margin-bottom: 6px;
+    }
+    .result-table-img {
+      width: 172px; height: 172px; object-fit: contain;
+      filter: drop-shadow(0 8px 24px rgba(255,140,60,0.22));
+      animation: tableFloat 2.8s ease-in-out infinite;
+    }
+    @keyframes tableFloat {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-6px); }
+    }
+    .result-ribbon {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,110,46,0.10);
+      border: 1.5px solid rgba(255,110,46,0.25);
+      color: #FF6E2E; border-radius: 10px;
+      padding: 7px 20px; font-size: 17px; font-weight: 900;
+      margin: 10px auto 16px;
+      letter-spacing: 0.04em;
+    }
+    .result-desc {
+      text-align: center; font-size: 14px; color: #6B5555; line-height: 1.7;
+    }
+    .result-desc b { color: #FF6E2E; font-weight: 900; }
+    .result-existing { margin-top: 10px; font-size: 12px; color: #B8AAAA; }
+
+    /* ── Table mini-row (result page) ───────────────── */
+    .section-head {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px;
+      font-size: 13px; font-weight: 700; color: #6B5555;
+    }
+    .table-mini-row {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+      margin-top: 14px;
+    }
+    .table-mini-item {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      position: relative;
+    }
+    .table-mini-img-wrap {
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s;
+    }
+    .table-mini-img-wrap.is-me {
+      background: #FFF0E6; outline: 2px solid #FF8C5A; outline-offset: 1px;
+      transform: scale(1.1);
+    }
+    .table-mini-img { width: 52px; height: 52px; object-fit: contain; }
+    .you-badge {
+      position: absolute; top: -10px;
+      font-size: 9px; font-weight: 800;
+      background: #FF8C5A; color: #fff;
+      padding: 2px 6px; border-radius: 8px; white-space: nowrap;
+    }
+    .table-mini-label { font-size: 10px; font-weight: 700; color: #9B9B9B; }
+    .table-mini-label.is-me { color: #FF8C5A; }
+
+    /* ── Action button ──────────────────────────────── */
+    .action-btn {
+      width: 100%; padding: 18px;
+      background: linear-gradient(145deg, #FFA040, #FF6E2E);
+      color: #fff; border: none; border-radius: 50px;
+      font-size: 18px; font-weight: 900; font-family: inherit;
+      cursor: pointer; letter-spacing: 0.03em;
+      box-shadow: 0 6px 20px rgba(255,110,46,0.32);
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .action-btn:hover { opacity: 0.88; }
+    .action-btn:active { transform: scale(0.975); }
+
+    /* ── Tables tab ─────────────────────────────────── */
+    .tables-tab { padding: 20px 16px 40px; }
+    .tables-tab-header { margin-bottom: 18px; }
+    .tables-tab-title { font-size: 20px; font-weight: 900; margin-bottom: 3px; }
+    .tables-tab-sub { font-size: 12px; color: #B8AAAA; }
+
+    .mini-row-tab {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 8px; margin-bottom: 22px;
+    }
+    .mini-card-tab {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 5px; position: relative;
+    }
+    .mini-card-tab img { width: 48px; height: 48px; object-fit: contain; }
+    .mini-card-tab.is-me img { filter: drop-shadow(0 2px 6px rgba(255,140,90,0.4)); transform: scale(1.1); }
+    .mini-label-tab { font-size: 10px; font-weight: 700; color: #9B9B9B; }
+    .mini-label-tab.is-me { color: #FF8C5A; }
+    .you-badge-tab {
+      position: absolute; top: -9px;
+      font-size: 9px; font-weight: 800;
+      background: #FF8C5A; color: #fff;
+      padding: 2px 6px; border-radius: 8px; white-space: nowrap;
+    }
+
+    .t-cards { display: flex; flex-direction: column; gap: 12px; }
+    .t-card {
+      background: #fff; border-radius: 18px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow: hidden;
+    }
+    .t-card.is-me { box-shadow: 0 0 0 2px #FF8C5A, 0 2px 12px rgba(255,140,90,0.15); }
+    .t-card-head {
+      padding: 13px 16px; display: flex; align-items: center; gap: 10px;
+    }
+    .t-card-head img { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; }
+    .t-card-name { font-size: 15px; font-weight: 800; }
+    .t-card-count { font-size: 12px; color: #B8AAAA; font-weight: 500; }
+    .t-card-you { margin-left: auto; font-size: 11px; font-weight: 700; color: #FF6E2E; background: #FFF0E6; padding: 4px 10px; border-radius: 20px; flex-shrink: 0; }
+    .t-card-body { padding: 4px 16px 14px; display: flex; flex-wrap: wrap; gap: 7px; min-height: 24px; }
+    .name-pill { font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 20px; background: #F5F3F0; color: #6B5555; }
+    .name-pill.is-me { background: #FFF0E6; color: #FF6E2E; outline: 1.5px solid #FF8C5A; font-weight: 700; }
+    .empty-label { font-size: 12px; color: #C5B8B8; padding: 4px 0; }
+
+    /* ── Animations ─────────────────────────────────── */
+    .result-anim { animation: resultIn 0.45s cubic-bezier(0.22,1,0.36,1) both; }
+    @keyframes resultIn {
+      from { opacity: 0; transform: translateY(20px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ── Confetti overlay ───────────────────────────── */
+    .confetti-layer { position: fixed; inset: 0; pointer-events: none; z-index: 300; overflow: hidden; }
+    .cp { position: absolute; top: -14px; animation: cpFall linear both; }
+    @keyframes cpFall { to { transform: translateY(105vh) rotate(600deg); opacity: 0; } }
+
+    /* ── PIN + Admin modal ──────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(60,40,20,0.45);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      z-index: 600; display: flex; align-items: center; justify-content: center;
+      padding: 24px; animation: moFadeIn 0.18s ease;
+    }
+    @keyframes moFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .pin-card, .admin-card {
+      background: #fff; border: 1px solid rgba(0,0,0,0.07); border-radius: 22px;
+      padding: 28px 24px; width: 100%; max-width: 300px;
+      display: flex; flex-direction: column; align-items: center; gap: 14px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+      animation: cardPop 0.28s cubic-bezier(0.22,1,0.36,1);
+    }
+    .admin-card { align-items: stretch; gap: 12px; max-width: 320px; }
+    @keyframes cardPop {
+      from { opacity: 0; transform: scale(0.92) translateY(14px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .pin-icon-wrap {
+      width: 46px; height: 46px; border-radius: 50%;
+      border: 1.5px solid rgba(0,0,0,0.1);
+      display: flex; align-items: center; justify-content: center; color: #9B8B8B;
+    }
+    .pin-label { font-size: 16px; font-weight: 800; color: #3D2C2C; }
+    .pin-sub { font-size: 12px; color: #B8AAAA; margin-top: -6px; }
+    .pin-dots-row {
+      position: relative; display: flex; gap: 16px;
+      padding: 10px 16px; cursor: pointer; border-radius: 12px;
+    }
+    .pin-dot {
+      width: 15px; height: 15px; border-radius: 50%;
+      border: 2px solid rgba(0,0,0,0.15);
+      transition: background 0.15s, border-color 0.15s, transform 0.12s;
+    }
+    .pin-dot.filled { background: #FF8C5A; border-color: #FF8C5A; transform: scale(1.15); }
+    .pin-dot.shake  { border-color: #F06292; animation: dotShake 0.42s ease; }
+    @keyframes dotShake {
+      0%,100% { transform: translateX(0); }
+      20%,60% { transform: translateX(-5px); }
+      40%,80% { transform: translateX(5px); }
+    }
+    .pin-hidden-input {
+      position: absolute; inset: 0; opacity: 0;
+      width: 100%; height: 100%; font-size: 16px;
+      cursor: pointer; caret-color: transparent; border: none; background: transparent;
+    }
+    .pin-error-msg { font-size: 12px; color: #F06292; margin-top: -4px; }
+    .pin-cancel-btn {
+      font-size: 13px; color: #B8AAAA;
+      background: transparent; border: none; cursor: pointer;
+      font-family: inherit; padding: 4px 16px;
+    }
+    .admin-card-header { display: flex; align-items: center; justify-content: space-between; }
+    .admin-card-title { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 700; color: #6B5555; }
+    .admin-close-btn {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: rgba(0,0,0,0.05); border: none;
+      display: flex; align-items: center; justify-content: center;
+      color: #B8AAAA; cursor: pointer;
+    }
+    .admin-stat { font-size: 13px; color: #9B8B8B; background: #FFF8F0; border: 1px solid rgba(0,0,0,0.06); border-radius: 11px; padding: 11px 14px; text-align: center; }
+    .admin-stat strong { color: #3D2C2C; font-weight: 700; }
+    .admin-danger-btn { width: 100%; padding: 14px; border-radius: 13px; background: rgba(240,98,146,0.08); border: 1px solid rgba(240,98,146,0.25); color: #F06292; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity 0.15s; }
+    .admin-danger-btn:hover { opacity: 0.75; }
+    .admin-confirm-block { display: flex; flex-direction: column; gap: 10px; }
+    .admin-confirm-msg { font-size: 13px; color: #9B8B8B; text-align: center; }
+    .admin-confirm-row { display: flex; gap: 8px; }
+    .admin-btn-cancel { flex:1; padding:12px; border-radius:12px; background:rgba(0,0,0,0.04); border:1px solid rgba(0,0,0,0.08); color:#6B5555; font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; }
+    .admin-btn-ok { flex:1; padding:12px; border-radius:12px; background:#fce7f3; border:none; color:#9d174d; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    /* ── Constants ──────────────────────────────────── */
+    const ADMIN_PIN  = '1234';   // ← 改這裡設定 PIN
+    const TAP_NEEDED = 5;
+    const TAP_WINDOW = 2500;
+
+    const KEY         = 'perfect-table-draw-v2';
+    const TABLE_COUNT = 5;
+    const CN          = ['一','二','三','四','五'];
+    const T_COLOR     = ['#B8860B','#4A7C4E','#5B4DA0','#1565C0','#880E4F'];
+    const CONFETTI_C  = ['#FF8C5A','#FFD166','#9575CD','#42A5F5','#F06292','#66BB6A','#FFB347'];
+
+    /* ── Firebase ───────────────────────────────────── */
+    const dbRef = db.ref(KEY);
+    function save(d) { dbRef.set(d); }
+
+    const TABLE_CAP = 5; // 每桌上限人數
+
+    // ★ 飲食分桌設定 ★
+    // 不吃牛肉 → 第 1、2 桌；其餘 → 第 3、4、5 桌
+    const DIET_RESERVED = {
+      nobeef: [1, 2],
+      veg:    [3, 4, 5],
+      all:    [3, 4, 5],
+    };
+
+    function pickTable(participants, diet) {
+      const counts = Array(TABLE_COUNT).fill(0);
+      participants.forEach(p => { if (p.table >= 1 && p.table <= TABLE_COUNT) counts[p.table-1]++; });
+
+      // 第 2 輪起（全滿過一次）：純平衡分配
+      if (participants.length >= TABLE_COUNT * TABLE_CAP) {
+        const min  = Math.min(...counts);
+        const pool = counts.reduce((a, c, i) => (c === min ? [...a, i+1] : a), []);
+        return pool[Math.floor(Math.random() * pool.length)];
+      }
+
+      // 第 1 輪：依飲食偏好分配到指定桌，桌滿才溢出
+      const preferred = (DIET_RESERVED[diet] || []).filter(t => counts[t-1] < TABLE_CAP);
+      if (preferred.length > 0) {
+        const min  = Math.min(...preferred.map(t => counts[t-1]));
+        const pool = preferred.filter(t => counts[t-1] === min);
+        return pool[Math.floor(Math.random() * pool.length)];
+      }
+
+      // 指定桌全滿 → 溢出到任何還有空位的桌
+      const fallback = counts.reduce((a, c, i) => (c < TABLE_CAP ? [...a, i+1] : a), []);
+      const min  = Math.min(...fallback.map(t => counts[t-1]));
+      const pool = fallback.filter(t => counts[t-1] === min);
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    /* ── Confetti ───────────────────────────────────── */
+    function Confetti({ active }) {
+      const pieces = useMemo(() => active ? Array.from({ length: 32 }, (_, i) => ({
+        id: i, x: Math.random() * 100, size: 7 + Math.random() * 9,
+        color: CONFETTI_C[i % CONFETTI_C.length],
+        dur: 1.3 + Math.random() * 0.9, delay: Math.random() * 0.55,
+        round: Math.random() > 0.5,
+      })) : [], [active]);
+      if (!active) return null;
+      return (
+        <div className="confetti-layer">
+          {pieces.map(p => (
+            <div key={p.id} className="cp" style={{
+              left: `${p.x}%`, width: p.size,
+              height: p.round ? p.size : p.size * 0.45,
+              background: p.color, borderRadius: p.round ? '50%' : '2px',
+              animationDuration: `${p.dur}s`, animationDelay: `${p.delay}s`,
+            }} />
+          ))}
+        </div>
+      );
+    }
+
+    /* ── PIN Modal ──────────────────────────────────── */
+    function PinModal({ onSuccess, onCancel }) {
+      const [pin, setPin]     = useState('');
+      const [shake, setShake] = useState(false);
+      const inputRef          = useRef(null);
+      useEffect(() => { setTimeout(() => inputRef.current?.focus(), 80); }, []);
+      function handleChange(e) {
+        const val = e.target.value.replace(/\D/g,'').slice(0,4);
+        setPin(val);
+        if (val.length === 4) {
+          if (val === ADMIN_PIN) { onSuccess(); }
+          else { setShake(true); setTimeout(() => { setShake(false); setPin(''); }, 620); }
+        }
+      }
+      return (
+        <div className="modal-overlay" onClick={onCancel}>
+          <div className="pin-card" onClick={e => e.stopPropagation()}>
+            <div className="pin-icon-wrap">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+            <div className="pin-label">管理員驗證</div>
+            <div className="pin-sub">輸入 4 位 PIN 碼</div>
+            <div className="pin-dots-row" onClick={() => inputRef.current?.focus()}>
+              {[0,1,2,3].map(i => (
+                <div key={i} className={`pin-dot${pin.length>i?' filled':''}${shake?' shake':''}`} />
+              ))}
+              <input ref={inputRef} type="tel" className="pin-hidden-input" value={pin}
+                onChange={handleChange} maxLength={4} inputMode="numeric" pattern="[0-9]*" autoComplete="off"/>
+            </div>
+            {shake && <div className="pin-error-msg">PIN 碼錯誤</div>}
+            <button className="pin-cancel-btn" onClick={onCancel}>取消</button>
+          </div>
+        </div>
+      );
+    }
+
+    /* ── Admin Panel ────────────────────────────────── */
+    function AdminPanel({ data, onReset, onClose }) {
+      const [confirm, setConfirm] = useState(false);
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="admin-card" onClick={e => e.stopPropagation()}>
+            <div className="admin-card-header">
+              <div className="admin-card-title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                管理員模式
+              </div>
+              <button className="admin-close-btn" onClick={onClose}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6 6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+            <div className="admin-stat">目前共&ensp;<strong>{data.participants.length}</strong>&ensp;人完成抽籤</div>
+            {!confirm ? (
+              <button className="admin-danger-btn" onClick={() => setConfirm(true)}>清除所有資料</button>
+            ) : (
+              <div className="admin-confirm-block">
+                <div className="admin-confirm-msg">清除後無法復原，確定嗎？</div>
+                <div className="admin-confirm-row">
+                  <button className="admin-btn-cancel" onClick={() => setConfirm(false)}>取消</button>
+                  <button className="admin-btn-ok" onClick={onReset}>確認清除</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    /* ── Tab icons ──────────────────────────────────── */
+    function HomeIcon({ on }) {
+      return (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={on?'#FF8C5A':'#C5B8B8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+      );
+    }
+    function GridIcon({ on }) {
+      return (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={on?'#FF8C5A':'#C5B8B8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect width="7" height="7" x="3" y="3" rx="1"/>
+          <rect width="7" height="7" x="14" y="3" rx="1"/>
+          <rect width="7" height="7" x="14" y="14" rx="1"/>
+          <rect width="7" height="7" x="3" y="14" rx="1"/>
+        </svg>
+      );
+    }
+
+    /* ── Hero section ───────────────────────────────── */
+    const DOTS = [
+      { x:'8%',  y:'18%', s:10, c:'#FF8C5A' },
+      { x:'18%', y:'72%', s:7,  c:'#FFD166' },
+      { x:'40%', y:'12%', s:6,  c:'#9575CD' },
+      { x:'50%', y:'75%', s:8,  c:'#42A5F5' },
+      { x:'62%', y:'20%', s:5,  c:'#F06292' },
+      { x:'72%', y:'65%', s:9,  c:'#66BB6A' },
+      { x:'30%', y:'48%', s:5,  c:'#FFB347' },
+    ];
+
+    function HeroSection({ title, subtitle, onTitleTap }) {
+      return (
+        <div className="hero">
+          <div className="hero-dots">
+            {DOTS.map((d,i) => (
+              <div key={i} className="dot" style={{
+                left: d.x, top: d.y, width: d.s, height: d.s,
+                background: d.c, opacity: 0.55,
+              }} />
+            ))}
+          </div>
+          <div className="hero-text">
+            <div
+              className="hero-title"
+              onClick={onTitleTap}
+              style={onTitleTap ? { userSelect:'none', cursor:'default', touchAction:'manipulation' } : {}}
+            >
+              {title}
+            </div>
+            <div className="hero-sub">{subtitle}</div>
+          </div>
+          <img src="image/lottery.png" alt="" className="hero-machine" draggable="false" />
+        </div>
+      );
+    }
+
+    /* ── Process card ───────────────────────────────── */
+    function ProcessCard() {
+      return (
+        <div className="card">
+          <div className="process-title">
+            <div className="process-title-line" />
+            流程說明
+            <div className="process-title-line" />
+          </div>
+          <div className="process-steps">
+
+            {/* Step 1 */}
+            <div className="process-step">
+              <div className="process-step-icon">
+                <img src="image/step1.png" alt="輸入姓名" className="step-img" draggable="false" />
+              </div>
+              <div className="process-step-title">輸入姓名</div>
+              <div className="process-step-sub">輸入你的<br/>姓名或暱稱</div>
+            </div>
+
+            <div className="process-arrow">
+              {/* lucide: arrow-right */}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D4C4C4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+
+            {/* Step 2 */}
+            <div className="process-step">
+              <div className="process-step-icon">
+                <img src="image/step2.png" alt="開始抽籤" className="step-img" draggable="false" />
+              </div>
+              <div className="process-step-title">開始抽籤</div>
+              <div className="process-step-sub">點擊按鈕<br/>進行抽籤</div>
+            </div>
+
+            <div className="process-arrow">
+              {/* lucide: arrow-right */}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D4C4C4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+
+            {/* Step 3 */}
+            <div className="process-step">
+              <div className="process-step-icon">
+                <img src="image/step3.png" alt="查看結果" className="step-img" draggable="false" />
+              </div>
+              <div className="process-step-title">查看結果</div>
+              <div className="process-step-sub">查看你被<br/>分到的桌號</div>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    /* ── Diet options ───────────────────────────────── */
+    const DIET_OPTIONS = [
+      { value: 'veg',   label: '我吃素',    color: '#4CAF50' },
+      { value: 'nobeef', label: '我不吃牛肉', color: '#FF9800' },
+      { value: 'all',   label: '我都吃',    color: '#9B8B8B' },
+    ];
+
+    /* ── Input card ─────────────────────────────────── */
+    function InputCard({ data, onDraw }) {
+      const [name, setName]       = useState('');
+      const [diet, setDiet]       = useState('');
+      const [error, setError]     = useState('');
+      const [dietError, setDietError] = useState(false);
+      const [loading, setLoading] = useState(false);
+      const inputRef              = useRef(null);
+
+      useEffect(() => { setTimeout(() => inputRef.current?.focus(), 120); }, []);
+
+      function handleDraw() {
+        const t = name.trim();
+        if (!t) { setError('請輸入姓名或暱稱'); return; }
+        if (!diet) { setDietError(true); return; }
+
+        // 快取中已有紀錄 → 直接顯示舊結果
+        const existing = data.participants.find(p => p.name.toLowerCase() === t.toLowerCase());
+        if (existing) {
+          onDraw({ name: existing.name, table: existing.table, diet: existing.diet, isExisting: true }, data);
+          return;
+        }
+
+        setLoading(true); setError(''); setDietError(false);
+
+        // Firebase Transaction：原子讀寫，解決同時送出的 race condition
+        dbRef.transaction((current) => {
+          const curr = current || { participants: [] };
+          if (!Array.isArray(curr.participants)) curr.participants = [];
+
+          // 再次確認（防止剛好同時有人用同名）
+          const dup = curr.participants.find(p => p.name.toLowerCase() === t.toLowerCase());
+          if (dup) return; // abort — 讓 onComplete 處理
+
+          const table = pickTable(curr.participants, diet);
+          const entry = { name: t, table, diet, ts: Date.now() };
+          return { participants: [...curr.participants, entry] };
+
+        }, (error, committed, snapshot) => {
+          setLoading(false);
+          if (error) { setError('寫入失敗，請再試一次'); return; }
+
+          const val = snapshot?.val() || { participants: [] };
+          if (!Array.isArray(val.participants)) val.participants = [];
+
+          if (!committed) {
+            // 同名已存在（極罕見的同時送出）
+            const ex = val.participants.find(p => p.name.toLowerCase() === t.toLowerCase());
+            if (ex) onDraw({ name: ex.name, table: ex.table, diet: ex.diet, isExisting: true }, val);
+            else setError('寫入失敗，請再試一次');
+            return;
+          }
+
+          const entry = val.participants.find(p => p.name === t);
+          setName(''); setDiet('');
+          onDraw({ name: entry.name, table: entry.table, diet: entry.diet, isExisting: false }, val);
+        });
+      }
+
+      return (
+        <div className="card">
+          <div className={`input-field-row${error ? ' has-error' : ''}`}>
+            <span className="field-icon">
+              {/* lucide: user */}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </span>
+            <input
+              ref={inputRef}
+              type="text"
+              className="name-input"
+              placeholder="請輸入姓名 / 暱稱"
+              value={name}
+              onChange={e => { setName(e.target.value); setError(''); }}
+              onKeyDown={e => e.key === 'Enter' && !loading && handleDraw()}
+              maxLength={20}
+              autoComplete="one-time-code" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+            />
+          </div>
+          {error && <div className="error-msg">{error}</div>}
+
+          <div className="diet-label">飲食偏好（必選）</div>
+          <div className="diet-pills">
+            {DIET_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                className={`diet-pill${diet === opt.value ? ' selected' : ''}${dietError && !diet ? ' has-error' : ''}`}
+                onClick={() => { setDiet(opt.value); setDietError(false); }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {dietError && <div className="error-msg" style={{marginTop:'-8px'}}>請選擇飲食偏好</div>}
+
+          <button className="draw-btn" onClick={handleDraw} disabled={loading}>
+            {loading ? (
+              <><div className="spinner" />&ensp;抽籤中…</>
+            ) : (
+              <>
+                {/* lucide: ticket */}
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+                  <path d="M13 5v2M13 17v2M13 11v2"/>
+                </svg>
+                開始抽籤
+              </>
+            )}
+          </button>
+
+          <div className="reminder-row">
+            {/* lucide: info */}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#C5B8B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+            </svg>
+            每人限抽一次，抽籤結果無法更改
+          </div>
+        </div>
+      );
+    }
+
+    /* ── Result card ────────────────────────────────── */
+    function ResultCard({ result }) {
+      const cn = CN[result.table - 1];
+      return (
+        <div className="card result-anim">
+          <div className="result-name-line">
+            <span className="result-name-em">{result.name}</span>，你抽到
+          </div>
+          <div className="result-orb-wrap">
+            <img src={`image/table${result.table}.png`} alt="" className="result-table-img" draggable="false" />
+          </div>
+          <div style={{ textAlign:'center' }}>
+            <span className="result-ribbon">第{cn}桌</span>
+          </div>
+          <div className="result-desc">
+            請前往 <b>第{cn}桌</b> 就座，謝謝！
+          </div>
+          {result.isExisting && (
+            <div className="result-existing" style={{ textAlign:'center' }}>你先前已完成抽籤</div>
+          )}
+        </div>
+      );
+    }
+
+    /* ── Table overview (result page) ───────────────── */
+    function TableMiniRow({ data, myResult }) {
+      const tables = useMemo(() =>
+        Array.from({ length: TABLE_COUNT }, (_, i) => ({
+          n: i + 1,
+          people: data.participants.filter(p => p.table === i + 1),
+        }))
+      , [data]);
+
+      return (
+        <div className="card result-anim" style={{ animationDelay: '0.08s' }}>
+          <div className="section-head">
+            {/* lucide: layout-grid */}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9B8B8B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/>
+              <rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>
+            </svg>
+            桌次一覽
+          </div>
+          <div className="table-mini-row">
+            {tables.map(t => {
+              const isMe = myResult && myResult.table === t.n;
+              return (
+                <div key={t.n} className="table-mini-item">
+                  {isMe && <div className="you-badge">你在這桌</div>}
+                  <div className={`table-mini-img-wrap${isMe ? ' is-me' : ''}`}>
+                    <img src={`image/table${t.n}.png`} alt="" className="table-mini-img" draggable="false" />
+                  </div>
+                  <div className={`table-mini-label${isMe ? ' is-me' : ''}`}>第{CN[t.n-1]}桌</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    /* ── Home Tab ───────────────────────────────────── */
+    function HomeTab({ data, myResult, onDraw, onViewTables, onTitleTap }) {
+      const [showConf, setShowConf] = useState(false);
+
+      function handleDraw(result, newData) {
+        onDraw(result, newData);
+        if (!result.isExisting) {
+          setShowConf(true);
+          setTimeout(() => setShowConf(false), 3200);
+        }
+      }
+
+      if (myResult) {
+        return (
+          <>
+            <Confetti active={showConf} />
+            <HeroSection title="抽籤結果" subtitle={"太棒了！\n快去找你的小夥伴一起坐吧！"} onTitleTap={onTitleTap} />
+            <div className="page-body">
+              <ResultCard result={myResult} />
+              <TableMiniRow data={data} myResult={myResult} />
+              <button className="action-btn result-anim" style={{ animationDelay:'0.16s' }} onClick={onViewTables}>
+                我知道了 🎉
+              </button>
+            </div>
+          </>
+        );
+      }
+
+      return (
+        <>
+          <Confetti active={showConf} />
+          <HeroSection title="歡迎參加活動！" subtitle="請先輸入姓名，再開始抽籤" onTitleTap={onTitleTap} />
+          <div className="page-body">
+            <InputCard data={data} onDraw={handleDraw} />
+            <ProcessCard />
+          </div>
+        </>
+      );
+    }
+
+    /* ── Tables Tab ─────────────────────────────────── */
+    function TablesTab({ data, myResult }) {
+      const tables = useMemo(() =>
+        Array.from({ length: TABLE_COUNT }, (_, i) => ({
+          n: i + 1, color: T_COLOR[i],
+          people: data.participants.filter(p => p.table === i + 1),
+        }))
+      , [data]);
+
+      return (
+        <div className="tables-tab">
+          <div className="tables-tab-header">
+            <div className="tables-tab-title">桌次一覽</div>
+            <div className="tables-tab-sub">共 {data.participants.length} 人完成抽籤</div>
+          </div>
+
+          <div className="mini-row-tab">
+            {tables.map(t => {
+              const isMe = myResult && myResult.table === t.n;
+              return (
+                <div key={t.n} className={`mini-card-tab${isMe ? ' is-me' : ''}`}>
+                  {isMe && <div className="you-badge-tab">你在這桌</div>}
+                  <img src={`image/table${t.n}.png`} alt="" draggable="false" />
+                  <div className={`mini-label-tab${isMe ? ' is-me' : ''}`}>第{CN[t.n-1]}桌</div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="t-cards">
+            {tables.map(t => {
+              const isMe = myResult && myResult.table === t.n;
+              return (
+                <div key={t.n} className={`t-card${isMe ? ' is-me' : ''}`}>
+                  <div className="t-card-head">
+                    <img src={`image/table${t.n}.png`} alt="" />
+                    <div>
+                      <div className="t-card-name" style={{ color: t.color }}>第{CN[t.n-1]}桌</div>
+                      <div className="t-card-count">{t.people.length} 人</div>
+                    </div>
+                    {isMe && <div className="t-card-you">你在這桌</div>}
+                  </div>
+                  <div className="t-card-body">
+                    {t.people.length === 0
+                      ? <span className="empty-label">暫無人員</span>
+                      : t.people.map(p => {
+                          const isMeChip = myResult && p.name === myResult.name;
+                          const dietInfo = DIET_OPTIONS.find(d => d.value === p.diet);
+                          return (
+                            <span key={p.name} className={`name-pill${isMeChip ? ' is-me' : ''}`}>
+                              {dietInfo && <span className="diet-dot" style={{ background: dietInfo.color }} />}
+                              {p.name}
+                            </span>
+                          );
+                        })
+                    }
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    /* ── App ────────────────────────────────────────── */
+    function App() {
+      const [tab, setTab]           = useState('home');
+      const [data, setData]         = useState({ participants: [] });
+      const [myResult, setMyResult] = useState(null);
+      const [showPin, setShowPin]   = useState(false);
+      const [adminOpen, setAdminOpen] = useState(false);
+      const tapCountRef = useRef(0);
+      const tapTimerRef = useRef(null);
+      const restoredRef = useRef(false);
+
+      // Firebase real-time listener
+      useEffect(() => {
+        dbRef.on('value', (snap) => {
+          const val = snap.val() || { participants: [] };
+          if (!Array.isArray(val.participants)) val.participants = [];
+          setData(val);
+
+          // Restore this user's result after page refresh (once)
+          if (!restoredRef.current) {
+            restoredRef.current = true;
+            const savedName = sessionStorage.getItem('ptd-my-name');
+            if (savedName) {
+              const me = val.participants.find(p => p.name === savedName);
+              if (me) setMyResult({ name: me.name, table: me.table, isExisting: false });
+            }
+          }
+        });
+        return () => dbRef.off();
+      }, []);
+
+      function handleTitleTap() {
+        clearTimeout(tapTimerRef.current);
+        tapCountRef.current += 1;
+        if (tapCountRef.current >= TAP_NEEDED) {
+          tapCountRef.current = 0; setShowPin(true);
+        } else {
+          tapTimerRef.current = setTimeout(() => { tapCountRef.current = 0; }, TAP_WINDOW);
+        }
+      }
+
+      function handleDraw(result, newData) {
+        setMyResult(result);
+        if (newData) setData(newData);
+        sessionStorage.setItem('ptd-my-name', result.name);
+      }
+
+      function handleAdminReset() {
+        const next = { participants: [] };
+        save(next); setMyResult(null); setAdminOpen(false);
+        sessionStorage.removeItem('ptd-my-name');
+      }
+
+      return (
+        <div className="app">
+          <div className="tab-content">
+            {tab === 'home'
+              ? <HomeTab data={data} myResult={myResult} onDraw={handleDraw} onViewTables={() => setTab('tables')} onTitleTap={handleTitleTap} />
+              : <TablesTab data={data} myResult={myResult} />
+            }
+          </div>
+
+          <div className="tab-bar">
+            <button className={`tab-btn${tab === 'home' ? ' active' : ''}`} onClick={() => setTab('home')}>
+              <HomeIcon on={tab === 'home'} />
+              <span className="tab-btn-label">首頁</span>
+            </button>
+            <button className={`tab-btn${tab === 'tables' ? ' active' : ''}`} onClick={() => setTab('tables')}>
+              <GridIcon on={tab === 'tables'} />
+              <span className="tab-btn-label">桌次一覽</span>
+            </button>
+          </div>
+
+          {showPin && (
+            <PinModal
+              onSuccess={() => { setShowPin(false); setAdminOpen(true); }}
+              onCancel={() => setShowPin(false)}
+            />
+          )}
+          {adminOpen && (
+            <AdminPanel data={data} onReset={handleAdminReset} onClose={() => setAdminOpen(false)} />
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

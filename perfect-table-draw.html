@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="抽桌">
+  <title>Perfect Table Draw</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #060606;
+      color: #fff;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+      height: 100dvh;
+    }
+
+    /* ── App shell ───────────────────────────────── */
+    .app {
+      height: 100dvh;
+      position: relative;
+      overflow: hidden;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* ── View transitions ────────────────────────── */
+    .view {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 32px;
+      transition: opacity 0.38s ease, transform 0.38s cubic-bezier(0.22,1,0.36,1);
+      will-change: opacity, transform;
+    }
+
+    .view--hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(28px);
+    }
+    .view--active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    .view--exit {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-20px);
+    }
+
+    /* ── INPUT VIEW ──────────────────────────────── */
+    .input-view {
+      justify-content: center;
+      gap: 0;
+    }
+
+    /* Person icon */
+    .person-icon-wrap {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 2px solid #E8004C;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+
+    /* Title block */
+    .input-title {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    .input-title-line1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: block;
+      line-height: 1.2;
+    }
+    .input-title-line2 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: block;
+      line-height: 1.2;
+    }
+    .input-title-line2 span {
+      color: #E8004C;
+    }
+
+    /* Input field */
+    .input-wrap {
+      width: 100%;
+      position: relative;
+      margin-bottom: 16px;
+    }
+    .input-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0.35;
+      pointer-events: none;
+    }
+    .name-input {
+      width: 100%;
+      padding: 16px 18px 16px 46px;
+      background: #111111;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      color: #fff;
+      font-size: 16px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    .name-input:focus { border-color: #E8004C; }
+    .name-input::placeholder { color: rgba(255,255,255,0.3); }
+    .name-input.has-error { border-color: rgba(248,113,113,0.7); }
+
+    .error-text {
+      font-size: 12px;
+      color: #f87171;
+      margin-top: 6px;
+      padding: 0 4px;
+    }
+
+    /* Draw button */
+    .draw-btn {
+      width: 100%;
+      padding: 18px;
+      background: #E8004C;
+      border: none;
+      border-radius: 50px;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 800;
+      font-family: inherit;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: opacity 0.15s, transform 0.1s;
+      margin-bottom: 24px;
+    }
+    .draw-btn:hover:not(:disabled) { opacity: 0.88; }
+    .draw-btn:active:not(:disabled) { transform: scale(0.975); }
+    .draw-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-spinner {
+      width: 18px; height: 18px;
+      border: 2.5px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .reminder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.35);
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    /* ── RESULT VIEW ─────────────────────────────── */
+    .result-view {
+      justify-content: flex-start;
+      padding-top: env(safe-area-inset-top, 48px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .result-view::-webkit-scrollbar { display: none; }
+
+    .result-inner {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 0 40px;
+      gap: 0;
+    }
+
+    /* Check icon */
+    .check-icon-wrap {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 2px solid #E8004C;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+
+    /* Name + "你抽到" */
+    .result-intro {
+      font-size: 18px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.8);
+      text-align: center;
+      margin-bottom: 10px;
+      letter-spacing: 0.02em;
+    }
+    .result-name-highlight { color: #fff; font-weight: 800; }
+
+    /* Pink divider */
+    .result-divider {
+      width: 32px;
+      height: 2px;
+      background: #E8004C;
+      border-radius: 2px;
+      margin-bottom: 20px;
+    }
+
+    /* Big table number */
+    .result-number-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 4px;
+      margin-bottom: 12px;
+      line-height: 1;
+    }
+    .result-kanji {
+      font-size: 36px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.5px;
+    }
+    .result-digit {
+      font-size: 100px;
+      font-weight: 900;
+      color: #E8004C;
+      line-height: 0.88;
+      letter-spacing: -4px;
+    }
+
+    /* Description */
+    .result-desc {
+      font-size: 15px;
+      color: rgba(255,255,255,0.5);
+      text-align: center;
+      margin-bottom: 36px;
+      letter-spacing: 0.02em;
+    }
+
+    /* Table overview section */
+    .overview-section {
+      width: 100%;
+      padding: 0 32px;
+    }
+    .overview-label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.3);
+      text-align: center;
+      letter-spacing: 0.08em;
+      margin-bottom: 16px;
+    }
+    .overview-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    .overview-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 7px;
+    }
+    .overview-circle {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #111111;
+      border: 1px solid rgba(255,255,255,0.08);
+      transition: background 0.2s;
+    }
+    .overview-circle.is-me {
+      background: #E8004C;
+      border-color: #E8004C;
+    }
+    .overview-item-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.3);
+      letter-spacing: 0.02em;
+    }
+    .overview-item-label.is-me {
+      color: #E8004C;
+    }
+
+    /* Footer note */
+    .result-footer {
+      width: 100%;
+      background: #0f0f0f;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin: 0 32px;
+      width: calc(100% - 64px);
+    }
+    .result-footer-icon {
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .result-footer-text {
+      font-size: 13px;
+      color: rgba(255,255,255,0.45);
+      line-height: 1.65;
+    }
+    .result-footer-text b { color: rgba(255,255,255,0.7); font-weight: 700; }
+
+    /* ── Complete roster ─────────────────────────── */
+    .roster-section {
+      width: calc(100% - 64px);
+      margin: 20px 32px 0;
+    }
+    .roster-heading {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.25);
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .roster-table {
+      background: #0f0f0f;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .roster-table-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .roster-table-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.75);
+      letter-spacing: 0.02em;
+    }
+    .roster-table-name.is-me { color: #E8004C; }
+    .roster-count {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 20px;
+      padding: 2px 9px;
+    }
+    .roster-names {
+      padding: 10px 16px 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 32px;
+    }
+    .roster-chip {
+      font-size: 12px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.55);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 20px;
+      padding: 4px 11px;
+    }
+    .roster-chip.is-me {
+      color: #E8004C;
+      background: rgba(232,0,76,0.08);
+      border-color: rgba(232,0,76,0.25);
+      font-weight: 700;
+    }
+    .roster-empty {
+      font-size: 12px;
+      color: rgba(255,255,255,0.18);
+      padding: 2px 0;
+    }
+
+    /* ── PIN + Admin modal ───────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.78);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 600;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      animation: moFadeIn 0.18s ease;
+    }
+    @keyframes moFadeIn { from { opacity:0; } to { opacity:1; } }
+
+    .pin-card, .admin-card {
+      background: #131313;
+      border: 1px solid rgba(255,255,255,0.11);
+      border-radius: 22px;
+      padding: 28px 24px;
+      width: 100%; max-width: 300px;
+      display: flex; flex-direction: column; align-items: center; gap: 14px;
+      animation: cardPop 0.28s cubic-bezier(0.22,1,0.36,1);
+    }
+    .admin-card { align-items: stretch; gap: 12px; max-width: 320px; }
+    @keyframes cardPop {
+      from { opacity:0; transform: scale(0.92) translateY(14px); }
+      to   { opacity:1; transform: scale(1) translateY(0); }
+    }
+
+    .pin-icon-wrap {
+      width: 46px; height: 46px; border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,0.14);
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(255,255,255,0.55);
+    }
+    .pin-label { font-size: 16px; font-weight: 700; }
+    .pin-sub { font-size: 12px; color: rgba(255,255,255,0.32); margin-top: -6px; }
+
+    .pin-dots-row {
+      position: relative; display: flex; gap: 16px;
+      padding: 10px 16px; cursor: pointer; border-radius: 12px;
+    }
+    .pin-dot {
+      width: 15px; height: 15px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.18);
+      transition: background 0.15s, border-color 0.15s, transform 0.12s;
+    }
+    .pin-dot.filled { background: #E8004C; border-color: #E8004C; transform: scale(1.15); }
+    .pin-dot.shake  { border-color: #f87171; animation: dotShake 0.42s ease; }
+    @keyframes dotShake {
+      0%,100% { transform: translateX(0); }
+      20%,60% { transform: translateX(-5px); }
+      40%,80% { transform: translateX(5px); }
+    }
+    .pin-hidden-input {
+      position: absolute; inset: 0; opacity: 0;
+      width: 100%; height: 100%; font-size: 16px;
+      cursor: pointer; caret-color: transparent; border: none; background: transparent;
+    }
+    .pin-error-msg { font-size: 12px; color: #f87171; margin-top: -4px; }
+    .pin-cancel-btn {
+      font-size: 13px; color: rgba(255,255,255,0.28);
+      background: transparent; border: none; cursor: pointer;
+      font-family: inherit; padding: 4px 16px;
+    }
+
+    /* Admin card */
+    .admin-card-header {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .admin-card-title {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.7);
+    }
+    .admin-close-btn {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: rgba(255,255,255,0.06); border: none;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(255,255,255,0.35); cursor: pointer;
+    }
+    .admin-stat {
+      font-size: 13px; color: rgba(255,255,255,0.4);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 11px; padding: 11px 14px; text-align: center;
+    }
+    .admin-stat strong { color: #fff; font-weight: 700; }
+    .admin-danger-btn {
+      width: 100%; padding: 14px; border-radius: 13px;
+      background: rgba(248,113,113,0.09);
+      border: 1px solid rgba(248,113,113,0.26);
+      color: #f87171; font-size: 14px; font-weight: 700;
+      font-family: inherit; cursor: pointer; transition: opacity 0.15s;
+    }
+    .admin-danger-btn:hover { opacity: 0.75; }
+    .admin-confirm-block { display: flex; flex-direction: column; gap: 10px; }
+    .admin-confirm-msg { font-size: 13px; color: rgba(255,255,255,0.4); text-align: center; }
+    .admin-confirm-row { display: flex; gap: 8px; }
+    .admin-btn-cancel {
+      flex:1; padding:12px; border-radius:12px;
+      background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
+      color:rgba(255,255,255,0.6); font-size:13px; font-weight:600;
+      font-family:inherit; cursor:pointer;
+    }
+    .admin-btn-ok {
+      flex:1; padding:12px; border-radius:12px;
+      background:#7f1d1d; border:none;
+      color:#fca5a5; font-size:13px; font-weight:700;
+      font-family:inherit; cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useRef, useEffect, useMemo } = React;
+
+    const ADMIN_PIN   = '1234';  // ← 改這裡設定 PIN
+    const TAP_NEEDED  = 5;
+    const TAP_WINDOW  = 2500;    // ms 內點滿 5 下才觸發
+
+    const KEY         = 'perfect-table-draw-v2';
+    const TABLE_COUNT = 5;
+    const CN          = ['一','二','三','四','五'];
+
+    function load() {
+      try {
+        const d = JSON.parse(localStorage.getItem(KEY));
+        return Array.isArray(d?.participants) ? d : { participants: [] };
+      } catch { return { participants: [] }; }
+    }
+
+    function save(d) {
+      try { localStorage.setItem(KEY, JSON.stringify(d)); } catch {}
+    }
+
+    function pickTable(participants) {
+      const counts = Array(TABLE_COUNT).fill(0);
+      participants.forEach(p => { if (p.table >= 1 && p.table <= TABLE_COUNT) counts[p.table-1]++; });
+      const min  = Math.min(...counts);
+      const pool = counts.reduce((a,c,i) => (c === min ? [...a, i+1] : a), []);
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    /* ── PIN Modal ───────────────────────────────── */
+    function PinModal({ onSuccess, onCancel }) {
+      const [pin, setPin]     = useState('');
+      const [shake, setShake] = useState(false);
+      const inputRef          = useRef(null);
+
+      useEffect(() => { setTimeout(() => inputRef.current?.focus(), 80); }, []);
+
+      function handleChange(e) {
+        const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+        setPin(val);
+        if (val.length === 4) {
+          if (val === ADMIN_PIN) {
+            onSuccess();
+          } else {
+            setShake(true);
+            setTimeout(() => { setShake(false); setPin(''); }, 620);
+          }
+        }
+      }
+
+      return (
+        <div className="modal-overlay" onClick={onCancel}>
+          <div className="pin-card" onClick={e => e.stopPropagation()}>
+            <div className="pin-icon-wrap">
+              {/* lucide: lock */}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="18" height="11" x="3" y="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+            <div className="pin-label">管理員驗證</div>
+            <div className="pin-sub">輸入 4 位 PIN 碼</div>
+            <div className="pin-dots-row" onClick={() => inputRef.current?.focus()}>
+              {[0,1,2,3].map(i => (
+                <div key={i} className={`pin-dot${pin.length > i ? ' filled' : ''}${shake ? ' shake' : ''}`} />
+              ))}
+              <input
+                ref={inputRef}
+                type="tel"
+                className="pin-hidden-input"
+                value={pin}
+                onChange={handleChange}
+                maxLength={4}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
+              />
+            </div>
+            {shake && <div className="pin-error-msg">PIN 碼錯誤</div>}
+            <button className="pin-cancel-btn" onClick={onCancel}>取消</button>
+          </div>
+        </div>
+      );
+    }
+
+    /* ── Admin Panel ─────────────────────────────── */
+    function AdminPanel({ data, onReset, onClose }) {
+      const [confirm, setConfirm] = useState(false);
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="admin-card" onClick={e => e.stopPropagation()}>
+            <div className="admin-card-header">
+              <div className="admin-card-title">
+                {/* lucide: shield */}
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                管理員模式
+              </div>
+              <button className="admin-close-btn" onClick={onClose}>
+                {/* lucide: x */}
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6 6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="admin-stat">
+              目前共&ensp;<strong>{data.participants.length}</strong>&ensp;人完成抽籤
+            </div>
+
+            {!confirm ? (
+              <button className="admin-danger-btn" onClick={() => setConfirm(true)}>
+                清除所有資料
+              </button>
+            ) : (
+              <div className="admin-confirm-block">
+                <div className="admin-confirm-msg">清除後無法復原，確定嗎？</div>
+                <div className="admin-confirm-row">
+                  <button className="admin-btn-cancel" onClick={() => setConfirm(false)}>取消</button>
+                  <button className="admin-btn-ok" onClick={onReset}>確認清除</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    /* ── Roster section component ────────────────── */
+    function RosterSection({ data, myResult }) {
+      const tables = useMemo(() =>
+        Array.from({ length: TABLE_COUNT }, (_, i) => ({
+          n: i + 1,
+          people: data.participants.filter(p => p.table === i + 1),
+        }))
+      , [data]);
+
+      return (
+        <div className="roster-section">
+          <div className="roster-heading">完整名單</div>
+          {tables.map(t => {
+            const isMyTable = myResult && myResult.table === t.n;
+            return (
+              <div key={t.n} className="roster-table">
+                <div className="roster-table-head">
+                  <span className={`roster-table-name${isMyTable ? ' is-me' : ''}`}>
+                    第{CN[t.n-1]}桌
+                  </span>
+                  <span className="roster-count">{t.people.length} 人</span>
+                </div>
+                <div className="roster-names">
+                  {t.people.length === 0
+                    ? <span className="roster-empty">—</span>
+                    : t.people.map(p => {
+                        const isMe = myResult && p.name === myResult.name;
+                        return (
+                          <span key={p.name} className={`roster-chip${isMe ? ' is-me' : ''}`}>
+                            {p.name}
+                          </span>
+                        );
+                      })
+                  }
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    /* ── Table chair icon ─────────────────────────── */
+    function ChairIcon({ active }) {
+      const c = active ? '#fff' : 'rgba(255,255,255,0.45)';
+      return (
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="5" stroke={c} strokeWidth="1.5"/>
+          <rect x="10.5" y="1.5" width="3" height="4" rx="1" fill={c}/>
+          <rect x="10.5" y="18.5" width="3" height="4" rx="1" fill={c}/>
+          <rect x="1.5" y="10.5" width="4" height="3" rx="1" fill={c}/>
+          <rect x="18.5" y="10.5" width="4" height="3" rx="1" fill={c}/>
+        </svg>
+      );
+    }
+
+    /* ── App ──────────────────────────────────────── */
+    function App() {
+      const [data, setData]       = useState(load);
+      const [name, setName]       = useState('');
+      const [result, setResult]   = useState(null);
+      const [error, setError]     = useState('');
+      const [loading, setLoading] = useState(false);
+      const [showPin, setShowPin]     = useState(false);
+      const [adminOpen, setAdminOpen] = useState(false);
+      const inputRef    = useRef(null);
+      const tapCountRef = useRef(0);   // ref 避免 stale closure
+      const tapTimerRef = useRef(null);
+
+      useEffect(() => { inputRef.current?.focus(); }, []);
+
+      function handleTitleTap() {
+        clearTimeout(tapTimerRef.current);
+        tapCountRef.current += 1;
+        if (tapCountRef.current >= TAP_NEEDED) {
+          tapCountRef.current = 0;
+          setShowPin(true);
+        } else {
+          tapTimerRef.current = setTimeout(() => { tapCountRef.current = 0; }, TAP_WINDOW);
+        }
+      }
+
+      function handleAdminReset() {
+        const next = { participants: [] };
+        save(next);
+        setData(next);
+        setResult(null);
+        setAdminOpen(false);
+      }
+
+      function handleDraw() {
+        const t = name.trim();
+        if (!t) { setError('請輸入姓名或暱稱'); return; }
+
+        const existing = data.participants.find(p => p.name.toLowerCase() === t.toLowerCase());
+        if (existing) {
+          setResult({ name: existing.name, table: existing.table });
+          return;
+        }
+
+        setLoading(true);
+        setError('');
+        setTimeout(() => {
+          const fresh = load();
+          const table = pickTable(fresh.participants);
+          const entry = { name: t, table, ts: Date.now() };
+          const next  = { participants: [...fresh.participants, entry] };
+          save(next);
+          setData(next);
+          setResult({ name: t, table });
+          setLoading(false);
+        }, 900);
+      }
+
+      const step = result ? 'result' : 'input';
+
+      return (
+        <div className="app">
+
+          {/* ── Input view ── */}
+          <div className={`view input-view view--${step === 'input' ? 'active' : 'exit'}`}>
+
+            <div className="person-icon-wrap">
+              {/* lucide: user */}
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E8004C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+
+            <div
+              className="input-title"
+              onClick={handleTitleTap}
+              style={{ userSelect: 'none', cursor: 'default', touchAction: 'manipulation' }}
+            >
+              <span className="input-title-line1">輸入姓名</span>
+              <span className="input-title-line2">即可 <span>開始抽籤</span></span>
+            </div>
+
+            <div className="input-wrap">
+              <span className="input-icon">
+                {/* lucide: user */}
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </span>
+              <input
+                ref={inputRef}
+                type="text"
+                className={`name-input${error ? ' has-error' : ''}`}
+                placeholder="請輸入您的姓名或暱稱"
+                value={name}
+                onChange={e => { setName(e.target.value); setError(''); }}
+                onKeyDown={e => e.key === 'Enter' && !loading && handleDraw()}
+                maxLength={20}
+                autoComplete="one-time-code"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck="false"
+              />
+              {error && <div className="error-text">{error}</div>}
+            </div>
+
+            <button className="draw-btn" onClick={handleDraw} disabled={loading}>
+              {loading ? <><div className="btn-spinner"/>&ensp;抽籤中…</> : '開始抽籤'}
+            </button>
+
+            <div className="reminder">
+              {/* lucide: info */}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 16v-4"/>
+                <path d="M12 8h.01"/>
+              </svg>
+              每人限抽一次，<br/>抽籤結果不可更改
+            </div>
+          </div>
+
+          {/* ── Result view ── */}
+          <div className={`view result-view view--${step === 'result' ? 'active' : 'hidden'}`}>
+            {result && (
+              <div className="result-inner">
+
+                <div className="check-icon-wrap">
+                  {/* lucide: check */}
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E8004C" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6 9 17l-5-5"/>
+                  </svg>
+                </div>
+
+                <div className="result-intro">
+                  <span className="result-name-highlight">{result.name}</span>，你抽到
+                </div>
+
+                <div className="result-divider" />
+
+                <div className="result-number-row">
+                  <span className="result-kanji">第</span>
+                  <span className="result-digit">{result.table}</span>
+                  <span className="result-kanji">桌</span>
+                </div>
+
+                <div className="result-desc">請前往第{CN[result.table-1]}桌就座</div>
+
+                {/* Table overview */}
+                <div className="overview-section">
+                  <div className="overview-label">桌位總覽（共 {TABLE_COUNT} 桌）</div>
+                  <div className="overview-row">
+                    {Array.from({ length: TABLE_COUNT }, (_, i) => {
+                      const n    = i + 1;
+                      const isMe = result.table === n;
+                      return (
+                        <div key={n} className="overview-item">
+                          <div className={`overview-circle${isMe ? ' is-me' : ''}`}>
+                            <ChairIcon active={isMe} />
+                          </div>
+                          <span className={`overview-item-label${isMe ? ' is-me' : ''}`}>{n}桌</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="result-footer">
+                  <span className="result-footer-icon">
+                    {/* lucide: map-pin */}
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8004C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                      <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                  </span>
+                  <div className="result-footer-text">
+                    請依現場工作人員指引<br/>
+                    前往<b>第{CN[result.table-1]}桌</b>就座，謝謝！
+                  </div>
+                </div>
+
+                {/* ── Complete roster ── */}
+                <RosterSection data={data} myResult={result} />
+
+              </div>
+            )}
+          </div>
+
+          {showPin && (
+            <PinModal
+              onSuccess={() => { setShowPin(false); setAdminOpen(true); }}
+              onCancel={() => setShowPin(false)}
+            />
+          )}
+          {adminOpen && (
+            <AdminPanel
+              data={data}
+              onReset={handleAdminReset}
+              onClose={() => setAdminOpen(false)}
+            />
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
