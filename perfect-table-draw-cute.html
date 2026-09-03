@@ -827,38 +827,35 @@
 
         setLoading(true); setError(''); setDietError(false);
 
-        // Firebase Transaction：原子讀寫，解決同時送出的 race condition
-        dbRef.transaction((current) => {
-          const curr = current || { participants: [] };
-          if (!Array.isArray(curr.participants)) curr.participants = [];
+        // Firebase Transaction：只操作 participants 子節點，不動 settings
+        db.ref(KEY + '/participants').transaction((current) => {
+          const participants = Array.isArray(current) ? current : [];
 
           // 再次確認（防止剛好同時有人用同名）
-          const dup = curr.participants.find(p => p.name.toLowerCase() === t.toLowerCase());
+          const dup = participants.find(p => p.name.toLowerCase() === t.toLowerCase());
           if (dup) return; // abort — 讓 onComplete 處理
 
-          const s = curr.settings || DEFAULT_SETTINGS;
-          const table = pickTable(curr.participants, diet, s);
+          const table = pickTable(participants, diet, settings);
           const entry = { name: t, table, diet, ts: Date.now() };
-          return { ...curr, participants: [...curr.participants, entry] };
+          return [...participants, entry];
 
         }, (error, committed, snapshot) => {
           setLoading(false);
           if (error) { setError('寫入失敗，請再試一次'); return; }
 
-          const val = snapshot?.val() || { participants: [] };
-          if (!Array.isArray(val.participants)) val.participants = [];
+          const participants = Array.isArray(snapshot?.val()) ? snapshot.val() : [];
 
           if (!committed) {
             // 同名已存在（極罕見的同時送出）
-            const ex = val.participants.find(p => p.name.toLowerCase() === t.toLowerCase());
-            if (ex) onDraw({ name: ex.name, table: ex.table, diet: ex.diet, isExisting: true }, val);
+            const ex = participants.find(p => p.name.toLowerCase() === t.toLowerCase());
+            if (ex) onDraw({ name: ex.name, table: ex.table, diet: ex.diet, isExisting: true }, { participants });
             else setError('寫入失敗，請再試一次');
             return;
           }
 
-          const entry = val.participants.find(p => p.name === t);
+          const entry = participants.find(p => p.name === t);
           setName(''); setDiet('');
-          onDraw({ name: entry.name, table: entry.table, diet: entry.diet, isExisting: false }, val);
+          onDraw({ name: entry.name, table: entry.table, diet: entry.diet, isExisting: false }, { participants });
         });
       }
 
