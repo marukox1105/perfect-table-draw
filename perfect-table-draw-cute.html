@@ -438,6 +438,16 @@
     .settings-diet-input { flex:1; border:1.5px solid rgba(0,0,0,0.1); border-radius:8px; padding:5px 8px; font-size:12px; font-family:inherit; color:#3D2C2C; background:#FAFAFA; outline:none; }
     .settings-diet-input:focus { border-color:#FF8C5A; background:#fff; }
     .settings-save-btn { width:100%; margin-top:14px; padding:13px; border-radius:13px; background:linear-gradient(145deg,#FFA040,#FF6E2E); border:none; color:#fff; font-size:14px; font-weight:800; font-family:inherit; cursor:pointer; box-shadow:0 4px 14px rgba(255,110,46,0.28); }
+    .settings-save-btn:disabled { opacity:0.6; cursor:not-allowed; }
+    .settings-save-error { margin-top:8px; font-size:12px; color:#F06292; text-align:center; font-weight:600; }
+    .admin-reset-error { font-size:12px; color:#F06292; text-align:center; margin-top:-4px; font-weight:600; }
+
+    /* ── DB connection banner ───────────────────────── */
+    .db-banner {
+      flex-shrink: 0; background: #FDEBEE; color: #C2185B;
+      font-size: 12px; font-weight: 700; text-align: center;
+      padding: 8px 12px; border-bottom: 1px solid rgba(194,24,91,0.15);
+    }
   </style>
 </head>
 <body>
@@ -573,18 +583,39 @@
       const [nobeefTables,  setNobeefTables]  = useState(settings.dietNobeefTables);
       const [allEnabled,    setAllEnabled]    = useState(settings.dietAllEnabled);
       const [allTables,     setAllTables]     = useState(settings.dietAllTables);
+      const [saving,        setSaving]        = useState(false);
       const [saved,         setSaved]         = useState(false);
+      const [saveError,     setSaveError]     = useState(false);
+      const [resetError,    setResetError]    = useState(false);
 
-      function handleSave() {
+      async function handleSave() {
         const next = {
           tableCount: tc, tableCap: cap,
           dietVegEnabled: vegEnabled,       dietVegTables: vegTables,
           dietNobeefEnabled: nobeefEnabled, dietNobeefTables: nobeefTables,
           dietAllEnabled: allEnabled,       dietAllTables: allTables,
         };
-        onSaveSettings(next);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 1500);
+        setSaving(true); setSaveError(false); setSaved(false);
+        try {
+          await onSaveSettings(next);
+          setSaved(true);
+          setTimeout(() => setSaved(false), 1500);
+        } catch (err) {
+          console.error('儲存設定失敗：', err);
+          setSaveError(true);
+        } finally {
+          setSaving(false);
+        }
+      }
+
+      async function handleReset() {
+        setResetError(false);
+        try {
+          await onReset();
+        } catch (err) {
+          console.error('清除資料失敗：', err);
+          setResetError(true);
+        }
       }
 
       const dietRows = [
@@ -619,14 +650,15 @@
               <>
                 <div className="admin-stat">目前共&ensp;<strong>{data.participants.length}</strong>&ensp;人完成抽籤</div>
                 {!confirm ? (
-                  <button className="admin-danger-btn" onClick={() => setConfirm(true)}>清除所有資料</button>
+                  <button className="admin-danger-btn" onClick={() => { setConfirm(true); setResetError(false); }}>清除所有資料</button>
                 ) : (
                   <div className="admin-confirm-block">
                     <div className="admin-confirm-msg">清除後無法復原，確定嗎？</div>
                     <div className="admin-confirm-row">
                       <button className="admin-btn-cancel" onClick={() => setConfirm(false)}>取消</button>
-                      <button className="admin-btn-ok" onClick={onReset}>確認清除</button>
+                      <button className="admin-btn-ok" onClick={handleReset}>確認清除</button>
                     </div>
+                    {resetError && <div className="admin-reset-error">⚠️ 清除失敗，請檢查網路連線後再試一次</div>}
                   </div>
                 )}
               </>
@@ -671,9 +703,10 @@
                     />
                   </div>
                 ))}
-                <button className="settings-save-btn" onClick={handleSave}>
-                  {saved ? '✓ 已儲存' : '儲存設定'}
+                <button className="settings-save-btn" onClick={handleSave} disabled={saving}>
+                  {saving ? '儲存中…' : saved ? '✓ 已儲存' : '儲存設定'}
                 </button>
+                {saveError && <div className="settings-save-error">⚠️ 儲存失敗，請檢查網路連線後再試一次</div>}
               </div>
             )}
           </div>
@@ -1099,6 +1132,7 @@
       const [myResult, setMyResult]   = useState(null);
       const [showPin, setShowPin]     = useState(false);
       const [adminOpen, setAdminOpen] = useState(false);
+      const [dbError, setDbError]     = useState(false);
       const tapCountRef = useRef(0);
       const tapTimerRef = useRef(null);
       const restoredRef = useRef(false);
@@ -1106,6 +1140,7 @@
       // Firebase real-time listener
       useEffect(() => {
         dbRef.on('value', (snap) => {
+          setDbError(false);
           const val = snap.val() || {};
           const participants = Array.isArray(val.participants) ? val.participants : [];
           setData({ participants });
@@ -1120,6 +1155,9 @@
               if (me) setMyResult({ name: me.name, table: me.table, isExisting: false });
             }
           }
+        }, (error) => {
+          console.error('Firebase 讀取失敗：', error);
+          setDbError(true);
         });
         return () => dbRef.off();
       }, []);
@@ -1141,18 +1179,21 @@
       }
 
       function handleAdminReset() {
-        db.ref(KEY + '/participants').set([]);
-        setMyResult(null); setAdminOpen(false);
-        sessionStorage.removeItem('ptd-my-name');
+        return db.ref(KEY + '/participants').set([]).then(() => {
+          setMyResult(null); setAdminOpen(false);
+          sessionStorage.removeItem('ptd-my-name');
+        });
       }
 
       function handleSaveSettings(newSettings) {
-        settingsRef.set(newSettings);
-        setSettings(newSettings);
+        return settingsRef.set(newSettings).then(() => {
+          setSettings(newSettings);
+        });
       }
 
       return (
         <div className="app">
+          {dbError && <div className="db-banner">⚠️ 無法連線到伺服器，畫面可能非最新，請檢查網路後重新整理</div>}
           <div className="tab-content">
             {tab === 'home'
               ? <HomeTab data={data} myResult={myResult} settings={settings} onDraw={handleDraw} onViewTables={() => setTab('tables')} onTitleTap={handleTitleTap} />
