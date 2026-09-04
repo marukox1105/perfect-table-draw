@@ -539,6 +539,15 @@
       const [shake, setShake] = useState(false);
       const inputRef          = useRef(null);
       useEffect(() => { setTimeout(() => inputRef.current?.focus(), 80); }, []);
+      // 防呆：PIN 視窗開著時，只要焦點跑掉（例如桌機版被背景的姓名欄位搶走），
+      // 按任何鍵就先把焦點拉回隱藏輸入框，確保鍵盤輸入不會打到別的地方。
+      useEffect(() => {
+        function ensureFocus() {
+          if (document.activeElement !== inputRef.current) inputRef.current?.focus();
+        }
+        window.addEventListener('keydown', ensureFocus, true);
+        return () => window.removeEventListener('keydown', ensureFocus, true);
+      }, []);
       function handleChange(e) {
         const val = e.target.value.replace(/\D/g,'').slice(0,4);
         setPin(val);
